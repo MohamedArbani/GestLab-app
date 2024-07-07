@@ -41,7 +41,7 @@ Ensure you have installed Docker (or Docker Desktop) in your local machine.
  - Run `php artisan key:generate`.
  - Run `php artisan migrate`.
  - Run `npm i && npm run dev`.
-4. In browser, access the page via `http://localhost:80/`.
+4. In browser, access the page via `http://localhost:8080/`.
 
 
 ## Contribution
