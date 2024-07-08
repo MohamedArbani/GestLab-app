@@ -50,6 +50,9 @@ import { Head } from "@inertiajs/vue3";
                             </div>
                         </div>
                     </div>
+                    <div v-if="filteredLaboratories.length === 0" class="text-center">
+                        <p>No laboratories found</p>
+                    </div>
                 </div>
             </div>
         </div>
