@@ -2,62 +2,41 @@
 
 namespace App\Http\Controllers;
 use App\Models\Laboratory;
-
-use Illuminate\Support\Facades\DB; // Correctly import the DB facade
-use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 
 class LaboratoryController extends Controller
 {
     public function index(Request $request)
     {
+        $laboratories = Laboratory::select(['id', 'name', 'address', 'phone', 'latitude', 'longitude'])
+            ->when($request->filled('labName'), function ($query) use ($request) {
+                $query->where('name', 'like', "%{$request->labName}%");
+            })
+            ->take(10)
+            ->get();
 
-    $laboratories = Laboratory::select(['id', 'name','address','phone', 'latitude', 'longitude'])
-    ->when($request->long && $request->lat, function ($query) use ($request) {
-        $query->addSelect(DB::raw("ST_Distance_Sphere(
-                POINT('$request->long', '$request->lat'), POINT(longitude, latitude)
-            ) as distance"))
-            ->orderBy('distance');
-    })
-    ->when($request->labName, function ($query, $labName) {
-        $query->where('laboratories.name', 'like', "%{$labName}%");
-    })
-    ->take(10)
-    ->get();
+        if ($request->filled(['long', 'lat'])) {
+            $longitude = (float) $request->long;
+            $latitude = (float) $request->lat;
 
-return response()->json([
-    'laboratories' => $laboratories,
-]);
-
-
-}
-}
-
-
-/*
-
-$query = Laboratory::query();
-
-        if ($request->has('labName')) {
-            $query->where('name', 'like', '%' . $request->labName . '%');
+            $laboratories = $laboratories->map(function ($lab) use ($latitude, $longitude) {
+                $lab->distance = $this->calculateDistance($latitude, $longitude, $lab->latitude, $lab->longitude);
+                return $lab;
+            })->sortBy('distance');
         }
 
-        if ($request->has('lat') && $request->has('long')) {
-            $lat = $request->lat;
-            $long = $request->long;
+        return response()->json([
+            'laboratories' => $laboratories->values()->all(),
+        ]);
+    }
 
-            // Simple distance calculation for demonstration purposes
-            $query->selectRaw("
-                *, ( 6371000 * acos( cos( radians(?) ) *
-                cos( radians( latitude ) )
-                * cos( radians( longitude ) - radians(?)
-                ) + sin( radians(?) ) *
-                sin( radians( latitude ) ) )
-                ) AS distance", [$lat, $long, $lat])
-                ->orderBy('distance');
-        }
-
-        $laboratories = $query->get();
-
-        return response()->json(['laboratories' => $laboratories]);
-*/
+    private function calculateDistance($lat1, $lon1, $lat2, $lon2)
+    {
+        $theta = $lon1 - $lon2;
+        $dist = sin(deg2rad($lat1)) * sin(deg2rad($lat2)) +  cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * cos(deg2rad($theta));
+        $dist = acos($dist);
+        $dist = rad2deg($dist);
+        $miles = $dist * 60 * 1.1515;
+        return ($miles * 1.609344); // Convert to kilometers
+    }
+}

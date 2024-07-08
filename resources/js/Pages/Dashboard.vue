@@ -1,71 +1,59 @@
 <script setup>
-import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
+import GuestLayout from "@/Layouts/GuestLayout.vue";
 import { Head } from "@inertiajs/vue3";
 </script>
 
 <template>
 
     <Head title="Dashboard" />
-    <AuthenticatedLayout>
+    <GuestLayout>
         <template #header>
             <h2 class="page-title">Dashboard</h2>
         </template>
-        <div class="container-xl">
-            <div class="card">
-                <div class="card-body">
-                    <!-- Search Box -->
-                    <div class="input-group input-group-flat mb-3">
-                        <span class="input-group-text">
-                            <a title="Search labs" data-bs-toggle="tooltip">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
-                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    class="icon icon-tabler icons-tabler-outline icon-tabler-search">
-                                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                                    <path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" />
-                                    <path d="M21 21l-6 -6" />
-                                </svg>
-                            </a>
-                        </span>
-                        <input type="text" v-model="searchQuery" placeholder="Search labs..." class="form-control">
+        <div class="py-12" id="laboratories">
+            <!-- Search Box -->
+            <div class="input-group input-group-flat mb-3">
+                <span class="input-group-text">
+                    <a title="Search labs" data-bs-toggle="tooltip">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                            class="icon icon-tabler icons-tabler-outline icon-tabler-search">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                            <path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" />
+                            <path d="M21 21l-6 -6" />
+                        </svg>
+                    </a>
+                </span>
+                <input type="text" v-model="searchQuery" placeholder="Search labs..." class="form-control">
+            </div>
+            <div class="">
+                <div v-show="error" class="alert alert-danger" role="alert">
+                    {{ error }}
+                </div>
+                <div v-show="loading && !error" class="text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
                     </div>
-                    <div id="table-default" class="table-responsive">
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th>
-                                        <button class="table-sort" data-sort="sort-name">Name</button>
-                                    </th>
-                                    <th>
-                                        <button class="table-sort" data-sort="sort-address">Address</button>
-                                    </th>
-                                    <th>
-                                        <button class="table-sort" data-sort="sort-phone">Phone</button>
-                                    </th>
-                                    <th>
-                                        <button class="table-sort" data-sort="sort-latitude">Latitude</button>
-                                    </th>
-                                    <th>
-                                        <button class="table-sort" data-sort="sort-longitude">Longitude</button>
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody class="table-tbody">
-                                <tr v-for="laboratory in filteredLaboratories" :key="laboratory.id">
-                                    <td class="sort-name">{{ laboratory.name }}</td>
-                                    <td class="sort-address">{{ laboratory.address }}</td>
-                                    <td class="sort-phone">{{ laboratory.phone }}</td>
-                                    <td class="sort-latitude">{{ laboratory.latitude }}</td>
-                                    <td class="sort-longitude">{{ laboratory.longitude }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                        <p v-if="error" class="error">{{ error }}</p>
+                </div>
+                <div v-show="!loading && !error" class="row">
+                    <div v-for="laboratory in filteredLaboratories" :key="laboratory.id"
+                        class="col-12 col-sm-6 col-md-4 col-lg-3 p-2">
+                        <div class="card h-100">
+                            <div class="card-body d-flex flex-column justify-content-between">
+                                <h5 class="card-title">{{ laboratory.name }}</h5>
+                                <p class="card-text" v-if="laboratory.distance">{{
+                                    parseInt(laboratory.distance).toLocaleString() }}m away</p>
+                                <div class="d-flex gap-2">
+                                    <a href="#" class="btn btn-primary w-50">Visit lab</a>
+                                    <a href="#" class="btn btn-secondary w-50">Show analysis</a>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-    </AuthenticatedLayout>
+    </GuestLayout>
 </template>
 
 <script>
@@ -75,6 +63,7 @@ export default {
             laboratories: [],
             error: null,
             searchQuery: '',
+            loading: false,
         };
     },
     mounted() {
@@ -91,17 +80,30 @@ export default {
     },
     methods: {
         async fetchLaboratories() {
-            try {
-                const response = await fetch('/laboratories');
-                if (!response.ok) {
-                    throw new Error('Failed to fetch laboratories');
+            this.loading = true;
+            navigator.geolocation.getCurrentPosition(async (position) => {
+                const { latitude, longitude } = position.coords;
+                try {
+                    const url = new URL('/laboratories', window.location.origin);
+                    url.searchParams.append('lat', latitude);
+                    url.searchParams.append('long', longitude);
+
+                    const response = await fetch(url);
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch laboratories');
+                    }
+                    const data = await response.json();
+                    this.laboratories = data.laboratories;
+                    console.log(data);
+                } catch (error) {
+                    this.error = error.message;
+                } finally {
+                    this.loading = false;
                 }
-                const data = await response.json();
-                this.laboratories = data.laboratories;
-                console.log(data);
-            } catch (error) {
-                this.error = error.message;
-            }
+            }, (error) => {
+                this.error = "Failed to get user's location";
+                this.loading = false;
+            });
         },
     },
 };
